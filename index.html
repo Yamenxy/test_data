@@ -300,24 +300,26 @@
                     </select>
                     <label style="font-size: 1em; color: #4a4a4a; margin-top: 15px;">الباركود:</label>
 <input type="text" name="الكود" id="unique_code" readonly placeholder="سيظهر هنا رقم الباركود بعد المسح">
-<div id="barcode-scanner-wrapper" style="display: none; position: relative; margin-top: 10px;">
-  <video id="barcode-scanner" autoplay muted playsinline style="width: 100%; border-radius: 10px;"></video>
-  <div id="barcode-guide" style="
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 80%;
-    height: 60px;
-    transform: translate(-50%, -50%);
-    border: 2px dashed white;
-    border-radius: 10px;
-    z-index: 10;"></div>
+<div id="barcode-scanner-wrapper" style="margin-top: 10px;">
+  <div id="reader" style="display: none; width: 100%; height: auto; position: relative;">
+    <div style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 80%;
+        height: 60px;
+        transform: translate(-50%, -50%);
+        border: 2px dashed white;
+        border-radius: 10px;
+        z-index: 10;"></div>
+  </div>
 </div>
+
+<!-- Buttons OUTSIDE the hidden reader area -->
 <button type="button" onclick="startScanner()">📷 مسح الباركود</button>
+<br><br>
+<button type="submit" id="submit">تسجيل</button>
 
-
-                    <br><br><br>
-                    <button type="submit" id="submit">تسجيل</button>
                 </div>
                 <div class="overlay" id="overlay"></div>
                 <div id="loadingOverlay" style="display: none;">
@@ -365,14 +367,14 @@
         const form = document.getElementById('contact-form');
         const loadingBox = document.getElementById('loadingBox');
 
-        function generateUniqueCode() {
-            const chars = '123456789';
-            let code = '';
-            for (let i = 0; i < 5; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return code;
-        }
+        // function generateUniqueCode() {
+        //     const chars = '123456789';
+        //     let code = '';
+        //     for (let i = 0; i < 5; i++) {
+        //         code += chars.charAt(Math.floor(Math.random() * chars.length));
+        //     }
+        //     return code;
+        // }
 
         function displayLoadingBox() {
             document.getElementById('loadingOverlay').style.display = 'block';
@@ -491,8 +493,13 @@
 
     if (isValid) {
         displayLoadingBox();
-        const uniqueCode = generateUniqueCode();
-        document.getElementById('unique_code').value = uniqueCode;
+        const uniqueCode = document.getElementById('unique_code').value;
+if (!uniqueCode) {
+    alert("لم يتم مسح الباركود بعد! برجاء مسحه أولاً.");
+    hideLoadingBox();
+    return;
+}
+
 
         // Prepend a single quote to the numbers
         const modifiedStudentNumber = "+2" + studentNumber;
@@ -506,13 +513,14 @@
         fetch(scriptURL, { method: 'POST', body: formData })
             .then(response => response.json())
             .then(response => {
-                hideLoadingBox();
-                if (response.result === 'success') {
-                    displaySuccessMessage(uniqueCode);
-                } else if (response.result === 'error') {
-                    alert(response.message);
-                }
-            })
+    hideLoadingBox();
+    if (response.result === 'success') {
+        displaySuccessMessage(uniqueCode); // This should use the scanned one
+    } else if (response.result === 'error') {
+        alert(response.message);
+    }
+})
+
             .catch(error => {
                 console.error('Error!', error.message);
                 hideLoadingBox();
@@ -531,49 +539,45 @@
             return arabicRegex.test(text);
         }
     </script>
-    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-function startScanner() {
-    const wrapper = document.getElementById("barcode-scanner-wrapper");
-    const video = document.getElementById("barcode-scanner");
-    wrapper.style.display = "block";
+    let scannerInstance;
 
-    Quagga.init({
-        inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: video,
-            constraints: {
-                facingMode: "environment"
+    function startScanner() {
+        document.getElementById("reader").style.display = "block";
+        const reader = new Html5Qrcode("reader");
+
+        reader.start(
+  { facingMode: "environment" },
+  {
+    fps: 10,
+    qrbox: { width: 300, height: 150 },
+    aspectRatio: 1.5,
+    disableFlip: false
+  },
+  
+            (decodedText, decodedResult) => {
+                console.log(`Code scanned: ${decodedText}`);
+                document.getElementById("unique_code").value = decodedText;
+                reader.stop().then(() => {
+                    console.log("Scanner stopped");
+                    document.getElementById("reader").style.display = "none";
+                }).catch(err => {
+                    console.error("Failed to stop scanner", err);
+                });
             },
-        },
-        decoder: {
-            readers: [
-                "code_128_reader", 
-                "ean_reader", 
-                "ean_8_reader", 
-                "upc_reader", 
-                "upc_e_reader"
-            ]
-        }
-    }, function(err) {
-        if (err) {
-            console.error(err);
-            alert("فشل في بدء الكاميرا");
-            return;
-        }
-        Quagga.start();
-    });
+            (errorMessage) => {
+                // optional error logging
+            }
+        ).catch(err => {
+            console.error("Error starting scanner", err);
+            alert("تعذر فتح الكاميرا. تحقق من الأذونات.");
+        });
 
-    Quagga.onDetected(function(data) {
-        const code = data.codeResult.code;
-        document.getElementById("unique_code").value = code;
-        Quagga.stop();
-        wrapper.style.display = "none";
-        alert("تم قراءة الباركود بنجاح: " + code);
-    });
-}
+        scannerInstance = reader;
+    }
 </script>
+
 
 
 </body>
